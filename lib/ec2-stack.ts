@@ -44,8 +44,10 @@ export class Ec2Stack extends cdk.Stack {
       'dnf install -y nodejs npm git',
       // Clone the tutorial repo — update this URL to your own fork
       'git clone https://github.com/chaotictoejam/AWSTutorials /app',
-      // Install dependencies for the EC2 app
+      // Install dependencies (including devDependencies for the TypeScript compiler)
       'cd /app/ec2 && npm install',
+      // Compile TypeScript to dist/ — the app runs from the compiled output
+      'cd /app/ec2 && npm run build',
       // pm2 is a process manager that keeps the app running and restarts it on crash
       'npm install -g pm2',
       // IMDSv2: fetch a session token first, then use it to get the instance's public IP.
@@ -54,7 +56,7 @@ export class Ec2Stack extends cdk.Stack {
       'TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")',
       'PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)',
       // Start the app with both TABLE_NAME and BASE_URL set
-      'cd /app/ec2 && TABLE_NAME=url-shortener BASE_URL=http://$PUBLIC_IP:3000 pm2 start app.js --name url-shortener',
+      'cd /app/ec2 && TABLE_NAME=url-shortener BASE_URL=http://$PUBLIC_IP:3000 pm2 start dist/app.js --name url-shortener',
       // Configure pm2 to restart the app automatically if the instance reboots
       'pm2 startup && pm2 save',
     );

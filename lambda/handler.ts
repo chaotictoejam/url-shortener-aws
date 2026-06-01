@@ -1,22 +1,21 @@
-'use strict';
-
-const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, PutCommand, GetCommand } = require('@aws-sdk/lib-dynamodb');
-const { nanoid } = require('nanoid');
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import { nanoid } from 'nanoid';
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 // Initialize once at module scope — Lambda reuses the execution environment on warm starts,
 // so this avoids paying the connection-setup cost on every invocation.
 const client = new DynamoDBClient({});
 const ddb = DynamoDBDocumentClient.from(client);
-const TABLE_NAME = process.env.TABLE_NAME;
+const TABLE_NAME = process.env.TABLE_NAME!; // set by the CDK stack
 
 /**
  * POST /shorten
- * Accepts { url } in the request body, generates a short code, stores the mapping,
+ * Accepts { url }, generates a short code, stores the mapping,
  * and returns { shortCode, shortUrl }.
  */
-const shorten = async (event) => {
-  const { url } = JSON.parse(event.body);
+export const shorten = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  const { url } = JSON.parse(event.body!);
 
   // nanoid(7) generates a 7-character URL-safe random string like "V1StGXR"
   const shortCode = nanoid(7);
@@ -45,8 +44,8 @@ const shorten = async (event) => {
  * Looks up the short code in DynamoDB and issues a 301 redirect to the original URL.
  * Returns 404 if the code doesn't exist.
  */
-const redirect = async (event) => {
-  const { shortCode } = event.pathParameters;
+export const redirect = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  const { shortCode } = event.pathParameters!;
 
   const result = await ddb.send(new GetCommand({
     TableName: TABLE_NAME,
@@ -64,7 +63,7 @@ const redirect = async (event) => {
   // 301 = permanent redirect; browsers cache this so they won't hit Lambda again
   return {
     statusCode: 301,
-    headers: { Location: result.Item.originalUrl },
+    headers: { Location: result.Item.originalUrl as string },
     body: '',
   };
 };
@@ -73,12 +72,10 @@ const redirect = async (event) => {
  * GET /health
  * Simple liveness check — lets you verify the function is deployed and responsive.
  */
-const health = async () => {
+export const health = async (): Promise<APIGatewayProxyResult> => {
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status: 'ok' }),
   };
 };
-
-module.exports = { shorten, redirect, health };

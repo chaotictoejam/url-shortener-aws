@@ -27,7 +27,7 @@ export class LambdaStack extends cdk.Stack {
 
     // Handles POST /shorten
     const shortenFn = new lambdaNode.NodejsFunction(this, 'ShortenFn', {
-      entry: path.join(__dirname, '../lambda/handler.js'),
+      entry: path.join(__dirname, '../lambda/handler.ts'),
       handler: 'shorten',
       runtime: lambda.Runtime.NODEJS_20_X,
       environment: sharedEnv,
@@ -35,7 +35,7 @@ export class LambdaStack extends cdk.Stack {
 
     // Handles GET /:shortCode and issues the redirect
     const redirectFn = new lambdaNode.NodejsFunction(this, 'RedirectFn', {
-      entry: path.join(__dirname, '../lambda/handler.js'),
+      entry: path.join(__dirname, '../lambda/handler.ts'),
       handler: 'redirect',
       runtime: lambda.Runtime.NODEJS_20_X,
       environment: sharedEnv,
@@ -43,7 +43,7 @@ export class LambdaStack extends cdk.Stack {
 
     // Handles GET /health
     const healthFn = new lambdaNode.NodejsFunction(this, 'HealthFn', {
-      entry: path.join(__dirname, '../lambda/handler.js'),
+      entry: path.join(__dirname, '../lambda/handler.ts'),
       handler: 'health',
       runtime: lambda.Runtime.NODEJS_20_X,
       environment: sharedEnv,
