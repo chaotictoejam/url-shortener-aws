@@ -1,0 +1,11 @@
+{
+  "name": "url-shortener-lambda",
+  "version": "1.0.0",
+  "description": "Lambda handlers for the URL shortener. CDK bundles these with esbuild at synth time — you do not run npm install here manually.",
+  "main": "handler.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.0.0",
+    "@aws-sdk/lib-dynamodb": "^3.0.0",
+    "nanoid": "^3.3.7"
+  }
+}

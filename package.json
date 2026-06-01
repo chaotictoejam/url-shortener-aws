@@ -1,0 +1,24 @@
+{
+  "name": "url-shortener-aws",
+  "version": "0.1.0",
+  "description": "Companion repo for the YouTube tutorial 'I Built the Same App 3 Ways on AWS'",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.257.0",
+    "constructs": "^10.0.0",
+    "source-map-support": "^0.5.21",
+    "nanoid": "^3.3.7",
+    "@aws-cdk/aws-apprunner-alpha": "2.257.0-alpha.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.x",
+    "aws-cdk": "^2.0.0",
+    "esbuild": "^0.21.0",
+    "ts-node": "^10.9.0",
+    "typescript": "~5.4.5"
+  }
+}
