@@ -40,13 +40,22 @@ export class AppRunnerStack extends cdk.Stack {
 
     // App Runner service: pulls the container from ECR, manages TLS, and auto-scales.
     // You get a public HTTPS URL with zero load balancer configuration.
-    const service = new apprunner.Service(this, 'UrlShortenerService', {
+    //
+    // BASE_URL self-reference: service.serviceUrl is a CloudFormation token that resolves
+    // to the App Runner domain after deploy — but we need it *inside* the Service constructor.
+    // cdk.Lazy.string defers evaluation until after the construct is assigned, which lets
+    // CloudFormation wire up the Fn::GetAtt reference correctly at deploy time.
+    let service!: apprunner.Service;
+    service = new apprunner.Service(this, 'UrlShortenerService', {
       source: apprunner.Source.fromEcr({
         repository: repo,
         tagOrDigest: 'latest',
         imageConfiguration: {
           port: 3000,
-          environmentVariables: { TABLE_NAME: table.tableName },
+          environmentVariables: {
+            TABLE_NAME: table.tableName,
+            BASE_URL: cdk.Lazy.string({ produce: () => `https://${service.serviceUrl}` }),
+          },
         },
       }),
       instanceRole,

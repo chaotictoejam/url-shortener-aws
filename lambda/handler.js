@@ -13,13 +13,16 @@ const TABLE_NAME = process.env.TABLE_NAME;
 /**
  * POST /shorten
  * Accepts { url } in the request body, generates a short code, stores the mapping,
- * and returns { shortCode }.
+ * and returns { shortCode, shortUrl }.
  */
 const shorten = async (event) => {
   const { url } = JSON.parse(event.body);
 
   // nanoid(7) generates a 7-character URL-safe random string like "V1StGXR"
   const shortCode = nanoid(7);
+
+  // Build the full clickable URL the caller can share immediately
+  const shortUrl = `${process.env.BASE_URL}/${shortCode}`;
 
   await ddb.send(new PutCommand({
     TableName: TABLE_NAME,
@@ -33,7 +36,7 @@ const shorten = async (event) => {
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ shortCode }),
+    body: JSON.stringify({ shortCode, shortUrl }),
   };
 };
 

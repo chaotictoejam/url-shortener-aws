@@ -25,6 +25,7 @@ app.post('/shorten', async (req, res) => {
   try {
     const { url } = req.body;
     const shortCode = nanoid(7);
+    const shortUrl = `${process.env.BASE_URL}/${shortCode}`;
 
     await ddb.send(new PutCommand({
       TableName: TABLE_NAME,
@@ -35,7 +36,7 @@ app.post('/shorten', async (req, res) => {
       },
     }));
 
-    res.json({ shortCode });
+    res.json({ shortCode, shortUrl });
   } catch (err) {
     console.error('shorten error:', err);
     res.status(500).json({ error: 'Failed to shorten URL' });
