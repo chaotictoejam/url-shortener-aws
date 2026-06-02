@@ -1,7 +1,7 @@
 {
-  "name": "url-shortener-app-runner",
+  "name": "url-shortener-ecs-express",
   "version": "1.0.0",
-  "description": "Express URL shortener packaged as a Docker container for App Runner",
+  "description": "Express URL shortener packaged as a Docker container for ECS Express Mode",
   "main": "dist/app.js",
   "scripts": {
     "build": "tsc",

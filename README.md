@@ -9,7 +9,7 @@ The same URL shortener (POST to shorten, GET to redirect) deployed three differe
 |---|---|---|
 | 1 | Lambda + API Gateway | Zero idle cost, pay-per-request |
 | 2 | EC2 + Express | Full server control, familiar model |
-| 3 | App Runner | Containers without the ops overhead |
+| 3 | ECS Express Mode | Containers without the ops overhead |
 
 ---
 
@@ -18,7 +18,7 @@ The same URL shortener (POST to shorten, GET to redirect) deployed three differe
 - **Node.js 20+** — `node --version`
 - **AWS CLI configured** — `aws configure` (or set `AWS_PROFILE`)
 - **AWS CDK bootstrapped** — run once per account/region: `cdk bootstrap`
-- **Docker** — only needed for the App Runner approach
+- **Docker** — needed for the ECS Express Mode approach
 
 ---
 
@@ -28,7 +28,7 @@ The same URL shortener (POST to shorten, GET to redirect) deployed three differe
 url-shortener-aws/
 ├── lambda/          # Approach 1 — Lambda handler (shorten, redirect, health)
 ├── ec2/             # Approach 2 — Express app for an EC2 instance
-├── app-runner/      # Approach 3 — Same Express app + Dockerfile for App Runner
+├── ecs-express/     # Approach 3 — Same Express app + Dockerfile for ECS Express Mode
 ├── lib/             # CDK stacks (one per approach)
 ├── bin/app.ts       # CDK entry point — instantiates all three stacks
 ├── cdk.json         # CDK config
@@ -44,12 +44,6 @@ git clone https://github.com/chaotictoejam/AWSTutorials
 cd url-shortener-aws
 npm install
 ```
-
-> **Note:** `@aws-cdk/aws-apprunner-alpha` must match your `aws-cdk-lib` version.
-> If you see peer dependency errors, run:
-> ```bash
-> npm install aws-cdk-lib @aws-cdk/aws-apprunner-alpha@alpha --legacy-peer-deps
-> ```
 
 ---
 
@@ -130,48 +124,61 @@ curl http://$IP:3000/health
 
 ---
 
-## Approach 3: App Runner
+## Approach 3: ECS Express Mode
 
-**How it works:** App Runner runs your Docker container and handles load balancing,
-TLS certificates, and auto-scaling automatically. You push an image to ECR and
-App Runner does the rest.
+> AWS App Runner no longer accepts new customers as of April 30, 2026.
+> This project uses Amazon ECS Express Mode, AWS's recommended replacement.
 
-### Before deploying
+**How it works:** ECS Express Mode provisions a Fargate-based ECS service
+with an Application Load Balancer, HTTPS via ACM, auto-scaling, and
+CloudWatch monitoring — from three inputs. The CDK stack handles DynamoDB
+and IAM. The ECS Express Mode service deploys via AWS CLI.
 
-**Step 1 — Create the ECR repository** (one-time):
+### Step 1 — Deploy the CDK stack
 
 ```bash
-aws ecr create-repository --repository-name url-shortener
+cdk deploy EcsExpressStack
 ```
 
-**Step 2 — Build and push the image:**
+Note the `TaskRoleArn`, `ExecutionRoleArn`, and `TableName` outputs — you'll
+need them in Step 3.
+
+### Step 2 — Build and push the Docker image
 
 ```bash
+cd ecs-express
+
 # Get your account ID and region
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 REGION=$(aws configure get region)
-ECR_URI=$ACCOUNT.dkr.ecr.$REGION.amazonaws.com/url-shortener
+ECR_URL=$ACCOUNT.dkr.ecr.$REGION.amazonaws.com
 
-# Authenticate Docker with ECR
-aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URI
-
-# Build and push
-docker build -t url-shortener ./app-runner
-docker tag url-shortener:latest $ECR_URI:latest
-docker push $ECR_URI:latest
+aws ecr create-repository --repository-name url-shortener
+aws ecr get-login-password | docker login --username AWS \
+  --password-stdin $ECR_URL
+docker build -t url-shortener .
+docker tag url-shortener:latest $ECR_URL/url-shortener:latest
+docker push $ECR_URL/url-shortener:latest
 ```
 
-### Deploy
+### Step 3 — Deploy the ECS Express Mode service
 
 ```bash
-cdk deploy AppRunnerStack
+aws ecs create-express-service \
+  --name url-shortener \
+  --image $ECR_URL/url-shortener:latest \
+  --port 3000 \
+  --task-role <TaskRoleArn from CDK output> \
+  --execution-role <ExecutionRoleArn from CDK output> \
+  --environment TABLE_NAME=url-shortener,BASE_URL=<your-service-url> \
+  --auto-scale-min 1 --auto-scale-max 5 \
+  --health-check-path /health
 ```
 
 ### Test
 
 ```bash
-# Replace $SERVICE_URL with the output from cdk deploy (it already includes https://)
-SERVICE_URL=https://abc123.us-east-1.awsapprunner.com
+SERVICE_URL=https://<your-ecs-express-domain>
 
 curl -X POST $SERVICE_URL/shorten \
   -H "Content-Type: application/json" \
@@ -180,6 +187,13 @@ curl -X POST $SERVICE_URL/shorten \
 curl -L $SERVICE_URL/V1StGXR
 
 curl $SERVICE_URL/health
+```
+
+### Tear it down
+
+```bash
+cdk destroy EcsExpressStack
+aws ecs delete-service --service url-shortener --force
 ```
 
 ---
