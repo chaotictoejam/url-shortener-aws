@@ -43,7 +43,7 @@ export class Ec2Stack extends cdk.Stack {
       // Install Node.js, npm, and git via the Amazon Linux 2023 package manager
       'dnf install -y nodejs npm git',
       // Clone the tutorial repo — update this URL to your own fork
-      'git clone https://github.com/chaotictoejam/AWSTutorials /app',
+      'git clone https://github.com/chaotictoejam/url-shortener-aws /app',
       // Install dependencies (including devDependencies for the TypeScript compiler)
       'cd /app/ec2 && npm install',
       // Compile TypeScript to dist/ — the app runs from the compiled output
