@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 
 export class EcsExpressStack extends cdk.Stack {
@@ -11,19 +12,17 @@ export class EcsExpressStack extends cdk.Stack {
     const table = new dynamodb.Table(this, 'UrlTable', {
       tableName: 'url-shortener',
       partitionKey: { name: 'shortCode', type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST, // no capacity planning required
-      removalPolicy: cdk.RemovalPolicy.DESTROY, // auto-delete when the stack is destroyed
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
-    // Task role — the IAM identity the running container assumes.
-    // This is what allows your app code to call DynamoDB.
+    // Task role — IAM identity the running container assumes to call DynamoDB.
     const taskRole = new iam.Role(this, 'TaskRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
     });
-    table.grantReadWriteData(taskRole); // least-privilege: only this table, read + write
+    table.grantReadWriteData(taskRole);
 
-    // Execution role — used by ECS itself (not your app) to pull the image from ECR
-    // and ship container logs to CloudWatch. The managed policy covers both.
+    // Execution role — used by ECS to pull the image from ECR and ship logs to CloudWatch.
     const executionRole = new iam.Role(this, 'ExecutionRole', {
       assumedBy: new iam.ServicePrincipal('ecs-tasks.amazonaws.com'),
       managedPolicies: [
@@ -33,26 +32,45 @@ export class EcsExpressStack extends cdk.Stack {
       ],
     });
 
-    // ECR repo reference — image must be pushed before running `cdk deploy`.
-    // ECS Express Mode reads the image URI from the CLI command (Step 3 in the README);
-    // this reference lets CDK verify the repo exists at synth time.
-    const _repo = ecr.Repository.fromRepositoryName(
-      this, 'Repo', 'url-shortener'
-    );
+    // Infrastructure role — assumed by the Express Gateway service (not tasks) to
+    // provision and manage the ALB, target groups, security groups, and auto-scaling.
+    const infrastructureRole = new iam.Role(this, 'InfrastructureRole', {
+      assumedBy: new iam.ServicePrincipal('ecs.amazonaws.com'),
+      managedPolicies: [
+        iam.ManagedPolicy.fromAwsManagedPolicyName(
+          'AmazonECSInfrastructureRoleforExpressGatewayServices'
+        ),
+      ],
+    });
 
-    // Output the role ARNs and table name — you'll paste these into the
-    // `aws ecs create-express-service` CLI command in Step 3.
-    new cdk.CfnOutput(this, 'TaskRoleArn', {
-      value: taskRole.roleArn,
-      description: 'Pass to --task-role in the ECS Express Mode deploy command',
+    const repo = ecr.Repository.fromRepositoryName(this, 'Repo', 'url-shortener');
+
+    // ECS Express Gateway Service — provisions the ALB, target groups, and auto-scaling
+    // automatically. BASE_URL is omitted here because it's the service's own endpoint,
+    // which is only known after creation (circular). Run `cdk deploy` a second time
+    // after the first deploy to set BASE_URL to the ServiceEndpoint output value.
+    const service = new ecs.CfnExpressGatewayService(this, 'Service', {
+      serviceName: 'url-shortener',
+      executionRoleArn: executionRole.roleArn,
+      infrastructureRoleArn: infrastructureRole.roleArn,
+      taskRoleArn: taskRole.roleArn,
+      primaryContainer: {
+        image: repo.repositoryUriForTag('latest'),
+        containerPort: 3000,
+        environment: [
+          { name: 'TABLE_NAME', value: table.tableName },
+        ],
+      },
+      healthCheckPath: '/health',
+      scalingTarget: {
+        minTaskCount: 1,
+        maxTaskCount: 5,
+      },
     });
-    new cdk.CfnOutput(this, 'ExecutionRoleArn', {
-      value: executionRole.roleArn,
-      description: 'Pass to --execution-role in the ECS Express Mode deploy command',
-    });
-    new cdk.CfnOutput(this, 'TableName', {
-      value: table.tableName,
-      description: 'Pass as TABLE_NAME in --environment',
+
+    new cdk.CfnOutput(this, 'ServiceEndpoint', {
+      value: service.attrEndpoint,
+      description: 'ALB endpoint — set as BASE_URL in a second cdk deploy to complete wiring',
     });
   }
 }

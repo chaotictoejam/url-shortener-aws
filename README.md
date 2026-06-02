@@ -131,69 +131,113 @@ curl http://$IP:3000/health
 
 **How it works:** ECS Express Mode provisions a Fargate-based ECS service
 with an Application Load Balancer, HTTPS via ACM, auto-scaling, and
-CloudWatch monitoring — from three inputs. The CDK stack handles DynamoDB
-and IAM. The ECS Express Mode service deploys via AWS CLI.
+CloudWatch monitoring automatically. The CDK stack handles everything —
+DynamoDB, IAM roles, and the Express Gateway service itself.
 
-### Step 1 — Deploy the CDK stack
+### Step 1 — Build and push the Docker image
 
-```bash
-cdk deploy EcsExpressStack
-```
-
-Note the `TaskRoleArn`, `ExecutionRoleArn`, and `TableName` outputs — you'll
-need them in Step 3.
-
-### Step 2 — Build and push the Docker image
-
+**macOS/Linux**
 ```bash
 cd ecs-express
 
-# Get your account ID and region
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 REGION=$(aws configure get region)
 ECR_URL=$ACCOUNT.dkr.ecr.$REGION.amazonaws.com
 
 aws ecr create-repository --repository-name url-shortener
-aws ecr get-login-password | docker login --username AWS \
-  --password-stdin 687611153613.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URL
 docker build -t url-shortener .
-docker tag url-shortener:latest 687611153613.dkr.ecr.us-east-1.amazonaws.com/url-shortener:latest
+docker tag url-shortener:latest $ECR_URL/url-shortener:latest
 docker push $ECR_URL/url-shortener:latest
 ```
 
-### Step 3 — Deploy the ECS Express Mode service
+**Windows (PowerShell)**
+```powershell
+cd ecs-express
+
+$ACCOUNT = aws sts get-caller-identity --query Account --output text
+$REGION  = aws configure get region
+$ECR_URL = "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
+
+aws ecr create-repository --repository-name url-shortener
+aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URL
+docker build -t url-shortener .
+docker tag url-shortener:latest "$ECR_URL/url-shortener:latest"
+docker push "$ECR_URL/url-shortener:latest"
+```
+
+### Step 2 — Deploy with CDK
 
 ```bash
-aws ecs create-express-service \
-  --name url-shortener \
-  --image $ECR_URL/url-shortener:latest \
-  --port 3000 \
-  --task-role <TaskRoleArn from CDK output> \
-  --execution-role <ExecutionRoleArn from CDK output> \
-  --environment TABLE_NAME=url-shortener,BASE_URL=<your-service-url> \
-  --auto-scale-min 1 --auto-scale-max 5 \
-  --health-check-path /health
+cdk deploy EcsExpressStack
 ```
+
+Note the `ServiceEndpoint` output — that's your ALB URL.
+
+### Step 3 — Wire BASE_URL (second deploy)
+
+`BASE_URL` is the service's own endpoint, which CloudFormation only knows after the first
+deploy. Set it and redeploy to complete wiring:
+
+**macOS/Linux**
+```bash
+SERVICE_URL=$(aws cloudformation describe-stacks --stack-name EcsExpressStack \
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceEndpoint'].OutputValue" \
+  --output text)
+
+cdk deploy EcsExpressStack --context baseUrl=$SERVICE_URL
+```
+
+**Windows (PowerShell)**
+```powershell
+$SERVICE_URL = aws cloudformation describe-stacks --stack-name EcsExpressStack `
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceEndpoint'].OutputValue" `
+  --output text
+
+cdk deploy EcsExpressStack --context baseUrl=$SERVICE_URL
+```
+
+> **Note:** Add `const baseUrl = this.node.tryGetContext('baseUrl') as string | undefined;`
+> and include `{ name: 'BASE_URL', value: baseUrl }` in `primaryContainer.environment`
+> if you want CDK to inject it automatically. On first deploy without `--context baseUrl`,
+> the app still works — `/shorten` responses will omit the host from the short URL.
 
 ### Test
 
+**macOS/Linux**
 ```bash
-SERVICE_URL=https://<your-ecs-express-domain>
+SERVICE_URL=$(aws cloudformation describe-stacks --stack-name EcsExpressStack \
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceEndpoint'].OutputValue" \
+  --output text)
 
 curl -X POST $SERVICE_URL/shorten \
   -H "Content-Type: application/json" \
   -d '{"url": "https://example.com"}'
 
 curl -L $SERVICE_URL/V1StGXR
-
 curl $SERVICE_URL/health
+```
+
+**Windows (PowerShell)**
+```powershell
+$SERVICE_URL = aws cloudformation describe-stacks --stack-name EcsExpressStack `
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceEndpoint'].OutputValue" `
+  --output text
+
+Invoke-RestMethod -Method Post -Uri "$SERVICE_URL/shorten" `
+  -ContentType "application/json" `
+  -Body '{"url": "https://example.com"}'
+
+# Follow redirect
+Invoke-WebRequest -Uri "$SERVICE_URL/V1StGXR" -MaximumRedirection 5
+
+Invoke-RestMethod "$SERVICE_URL/health"
 ```
 
 ### Tear it down
 
 ```bash
 cdk destroy EcsExpressStack
-aws ecs delete-service --service url-shortener --force
 ```
 
 ---
