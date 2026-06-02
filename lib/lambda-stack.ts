@@ -71,9 +71,9 @@ export class LambdaStack extends cdk.Stack {
     const shortCodeResource = api.root.addResource('{shortCode}');
     shortCodeResource.addMethod('GET', new apigateway.LambdaIntegration(redirectFn));
 
-    // BASE_URL for the shorten function: the API's own endpoint without a trailing slash.
-    // We build it from first-class CDK properties rather than hardcoding "prod" or the region.
-    const baseUrl = `https://${api.restApiId}.execute-api.${this.region}.amazonaws.com/${api.deploymentStage.stageName}`;
+    // BASE_URL for the shorten function. Only the RestApi ID is referenced here — safe because
+    // AWS::ApiGateway::RestApi has no dependency on Lambda and won't create a circular reference.
+    const baseUrl = `https://${api.restApiId}.execute-api.${this.region}.amazonaws.com`;
     shortenFn.addEnvironment('BASE_URL', baseUrl);
 
     // Print the deployed URL after `cdk deploy` so you can test immediately
