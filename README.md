@@ -155,9 +155,9 @@ ECR_URL=$ACCOUNT.dkr.ecr.$REGION.amazonaws.com
 
 aws ecr create-repository --repository-name url-shortener
 aws ecr get-login-password | docker login --username AWS \
-  --password-stdin $ECR_URL
+  --password-stdin 687611153613.dkr.ecr.us-east-1.amazonaws.com
 docker build -t url-shortener .
-docker tag url-shortener:latest $ECR_URL/url-shortener:latest
+docker tag url-shortener:latest 687611153613.dkr.ecr.us-east-1.amazonaws.com/url-shortener:latest
 docker push $ECR_URL/url-shortener:latest
 ```
 
