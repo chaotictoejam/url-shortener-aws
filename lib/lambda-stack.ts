@@ -73,7 +73,7 @@ export class LambdaStack extends cdk.Stack {
 
     // BASE_URL for the shorten function. Only the RestApi ID is referenced here — safe because
     // AWS::ApiGateway::RestApi has no dependency on Lambda and won't create a circular reference.
-    const baseUrl = `https://${api.restApiId}.execute-api.${this.region}.amazonaws.com`;
+    const baseUrl = `https://${api.restApiId}.execute-api.${this.region}.amazonaws.com/prod`;
     shortenFn.addEnvironment('BASE_URL', baseUrl);
 
     // Print the deployed URL after `cdk deploy` so you can test immediately
