@@ -38,12 +38,22 @@ export class EcsExpressStack extends cdk.Stack {
       assumedBy: new iam.ServicePrincipal('ecs.amazonaws.com'),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName(
-          'AmazonECSInfrastructureRoleforExpressGatewayServices'
+          'service-role/AmazonECSInfrastructureRoleforExpressGatewayServices'
         ),
       ],
     });
 
     const repo = ecr.Repository.fromRepositoryName(this, 'Repo', 'url-shortener');
+
+    // Service-linked roles required by Express Gateway Service to provision the ALB
+    // and Application Auto Scaling. CfnServiceLinkedRole is idempotent — CloudFormation
+    // returns the existing role ARN if it already exists, so this is safe on any account.
+    const slrElb = new iam.CfnServiceLinkedRole(this, 'SlrElb', {
+      awsServiceName: 'elasticloadbalancing.amazonaws.com',
+    });
+    const slrAutoscaling = new iam.CfnServiceLinkedRole(this, 'SlrAutoscaling', {
+      awsServiceName: 'ecs.application-autoscaling.amazonaws.com',
+    });
 
     // ECS Express Gateway Service — provisions the ALB, target groups, and auto-scaling
     // automatically. BASE_URL is omitted here because it's the service's own endpoint,
@@ -67,6 +77,8 @@ export class EcsExpressStack extends cdk.Stack {
         maxTaskCount: 5,
       },
     });
+    service.addDependency(slrElb);
+    service.addDependency(slrAutoscaling);
 
     new cdk.CfnOutput(this, 'ServiceEndpoint', {
       value: service.attrEndpoint,
