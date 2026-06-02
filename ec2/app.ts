@@ -7,7 +7,7 @@ const app = express();
 app.use(express.json()); // Parse JSON request bodies automatically
 
 // Initialize DynamoDB once at startup — same reasoning as the Lambda version
-const client = new DynamoDBClient({});
+const client = new DynamoDBClient({ region: process.env.AWS_REGION });
 const ddb = DynamoDBDocumentClient.from(client);
 const TABLE_NAME = process.env.TABLE_NAME!;
 

@@ -55,8 +55,9 @@ export class Ec2Stack extends cdk.Stack {
       // so we read it at boot time from the EC2 metadata service instead.
       'TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")',
       'PUBLIC_IP=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/public-ipv4)',
-      // Start the app with both TABLE_NAME and BASE_URL set
-      'cd /app/ec2 && TABLE_NAME=url-shortener BASE_URL=http://$PUBLIC_IP:3000 pm2 start dist/app.js --name url-shortener',
+      'REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/region)',
+      // Start the app with TABLE_NAME, BASE_URL, and AWS_REGION set
+      'cd /app/ec2 && TABLE_NAME=url-shortener BASE_URL=http://$PUBLIC_IP:3000 AWS_REGION=$REGION pm2 start dist/app.js --name url-shortener',
       // Configure pm2 to restart the app automatically if the instance reboots
       'pm2 startup && pm2 save',
     );
