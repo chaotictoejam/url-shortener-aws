@@ -50,16 +50,6 @@ export class EcsExpressStack extends cdk.Stack {
       directory: path.join(__dirname, '../ecs-express'),
     });
 
-    // Service-linked roles required by Express Gateway Service to provision the ALB
-    // and Application Auto Scaling. CfnServiceLinkedRole is idempotent — CloudFormation
-    // returns the existing role ARN if it already exists, so this is safe on any account.
-    const slrElb = new iam.CfnServiceLinkedRole(this, 'SlrElb', {
-      awsServiceName: 'elasticloadbalancing.amazonaws.com',
-    });
-    const slrAutoscaling = new iam.CfnServiceLinkedRole(this, 'SlrAutoscaling', {
-      awsServiceName: 'ecs.application-autoscaling.amazonaws.com',
-    });
-
     // BASE_URL is the service's own endpoint — only known after first deploy.
     // Pass --context baseUrl=<ServiceEndpoint> on a second deploy to wire it.
     const baseUrl = this.node.tryGetContext('baseUrl') as string | undefined;
@@ -86,8 +76,6 @@ export class EcsExpressStack extends cdk.Stack {
         maxTaskCount: 5,
       },
     });
-    service.addDependency(slrElb);
-    service.addDependency(slrAutoscaling);
 
     new cdk.CfnOutput(this, 'ServiceEndpoint', {
       value: service.attrEndpoint,
