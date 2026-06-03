@@ -1,7 +1,7 @@
 # URL Shortener — 3 Ways on AWS (CDK)
 
 Companion repo for the YouTube tutorial **"I Built the Same App 3 Ways on AWS."**
-[▶ Watch on YouTube](https://www.youtube.com/@DrJoanneSkiles) <!-- update with final video link -->
+[▶ Watch on YouTube](https://youtu.be/kv-OnMqwCLs)
 
 The same URL shortener (POST to shorten, GET to redirect) deployed three different ways using AWS CDK:
 
