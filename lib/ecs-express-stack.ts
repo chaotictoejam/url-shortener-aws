@@ -55,6 +55,7 @@ export class EcsExpressStack extends cdk.Stack {
     const baseUrl = this.node.tryGetContext('baseUrl') as string | undefined;
     const environment: ecs.CfnExpressGatewayService.KeyValuePairProperty[] = [
       { name: 'TABLE_NAME', value: table.tableName },
+      { name: 'AWS_DEFAULT_REGION', value: this.region },
     ];
     if (baseUrl) {
       environment.push({ name: 'BASE_URL', value: baseUrl });
