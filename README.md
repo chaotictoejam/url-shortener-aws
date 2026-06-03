@@ -134,39 +134,10 @@ with an Application Load Balancer, HTTPS via ACM, auto-scaling, and
 CloudWatch monitoring automatically. The CDK stack handles everything —
 DynamoDB, IAM roles, and the Express Gateway service itself.
 
-### Step 1 — Build and push the Docker image
+### Step 1 — Deploy with CDK
 
-**macOS/Linux**
-```bash
-cd ecs-express
-
-ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-REGION=$(aws configure get region)
-ECR_URL=$ACCOUNT.dkr.ecr.$REGION.amazonaws.com
-
-aws ecr create-repository --repository-name url-shortener
-aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URL
-docker build -t url-shortener .
-docker tag url-shortener:latest $ECR_URL/url-shortener:latest
-docker push $ECR_URL/url-shortener:latest
-```
-
-**Windows (PowerShell)**
-```powershell
-cd ecs-express
-
-$ACCOUNT = aws sts get-caller-identity --query Account --output text
-$REGION  = aws configure get region
-$ECR_URL = "$ACCOUNT.dkr.ecr.$REGION.amazonaws.com"
-
-aws ecr create-repository --repository-name url-shortener
-aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_URL
-docker build -t url-shortener .
-docker tag url-shortener:latest "$ECR_URL/url-shortener:latest"
-docker push "$ECR_URL/url-shortener:latest"
-```
-
-### Step 2 — Deploy with CDK
+`cdk deploy` builds the Docker image locally and pushes it to ECR automatically —
+no manual `docker build` or `docker push` needed. Requires Docker running locally.
 
 ```bash
 cdk deploy EcsExpressStack
@@ -174,7 +145,7 @@ cdk deploy EcsExpressStack
 
 Note the `ServiceEndpoint` output — that's your ALB URL.
 
-### Step 3 — Wire BASE_URL (second deploy)
+### Step 2 — Wire BASE_URL (second deploy)
 
 `BASE_URL` is the service's own endpoint, which CloudFormation only knows after the first
 deploy. Set it and redeploy to complete wiring:
@@ -196,11 +167,6 @@ $SERVICE_URL = aws cloudformation describe-stacks --stack-name EcsExpressStack `
 
 cdk deploy EcsExpressStack --context baseUrl=$SERVICE_URL
 ```
-
-> **Note:** Add `const baseUrl = this.node.tryGetContext('baseUrl') as string | undefined;`
-> and include `{ name: 'BASE_URL', value: baseUrl }` in `primaryContainer.environment`
-> if you want CDK to inject it automatically. On first deploy without `--context baseUrl`,
-> the app still works — `/shorten` responses will omit the host from the short URL.
 
 ### Test
 
